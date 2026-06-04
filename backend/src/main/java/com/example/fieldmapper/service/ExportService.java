@@ -27,6 +27,19 @@ public class ExportService {
         this.datasourceProperties = datasourceProperties;
     }
 
+    private DatasourceConfig resolveDatasource(String key) {
+        if (key == null || key.isBlank()) {
+            throw new IllegalArgumentException("datasource key is required");
+        }
+        Map<String, DatasourceConfig> all = datasourceProperties.getDatasources();
+        DatasourceConfig ds = all.get(key);
+        if (ds == null) {
+            throw new IllegalArgumentException("Unknown datasource: " + key
+                    + ". Available: " + String.join(", ", all.keySet()));
+        }
+        return ds;
+    }
+
     public File export(MappingRequest req) throws Exception {
         DatasourceConfig ds = resolveDatasource(req.getDatasource());
         validate(req, ds);
@@ -141,22 +154,9 @@ public class ExportService {
         return file;
     }
 
-    private DatasourceConfig resolveDatasource(String key) {
-        if (key == null || key.isBlank()) {
-            throw new IllegalArgumentException("datasource key is required");
-        }
-        Map<String, DatasourceConfig> all = datasourceProperties.getDatasources();
-        DatasourceConfig ds = all.get(key);
-        if (ds == null) {
-            throw new IllegalArgumentException("Unknown datasource: " + key
-                    + ". Available: " + String.join(", ", all.keySet()));
-        }
-        return ds;
-    }
-
     private String buildJdbcUrl(DatasourceConfig ds) {
         if ("oracle".equalsIgnoreCase(ds.getType())) {
-            return "jdbc:oracle:thin:@" + ds.getHost() + ":" + ds.getPort() + ":" + ds.getDatabase();
+            return "jdbc:oracle:thin:@//" + ds.getHost() + ":" + ds.getPort() + "/" + ds.getDatabase();
         }
         return "jdbc:postgresql://" + ds.getHost() + ":" + ds.getPort() + "/" + ds.getDatabase();
     }

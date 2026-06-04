@@ -1,41 +1,44 @@
 server:
   port: 8080
 
-spring:
-  datasource:
-    hikari:
-      maximum-pool-size: 2
-      minimum-idle: 0
+app:
+  datasources:
+    pg-local:
+      type: postgresql
+      host: localhost
+      port: 5432
+      database: postgres
+      schema: public
+      username: postgres
+      password: postgres
 
-# Predefined database connections
-datasources:
-  pg-local:
-    type: postgresql
-    host: localhost
-    port: 5432
-    database: postgres
-    schema: public
-    username: postgres
-    password: postgres
+    oracle-local:
+      type: oracle
+      host: localhost
+      port: 1521
+      database: FREEPDB1
+      schema: HISSAAS
+      username: HISSAAS
+      password: hissaas123
 
-  oracle-local:
-    type: oracle
-    host: localhost
-    port: 1521
-    database: FREEPDB1
-    schema: HISSAAS
-    username: HISSAAS
-    password: hissaas123
+    melone:
+      type: oracle
+      host: localhost
+      port: 1521
+      database: FREEPDB1
+      schema: MELONE
+      username: melone
+      password: melone123
 
-  oracle-cdb:
-    type: oracle
-    host: localhost
-    port: 1521
-    database: FREE
-    schema: SYSTEM
-    username: sys
-    password: oracle123
-    sysdba: true
+    oracle-cdb:
+      type: oracle
+      host: localhost
+      port: 1521
+      database: FREE
+      schema: SYSTEM
+      username: sys
+      password: oracle123
+      sysdba: true
 
 export:
   output-dir: ${java.io.tmpdir}/field-mapper-exports
