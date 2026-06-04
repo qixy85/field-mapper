@@ -49,4 +49,15 @@ public class BudgetController {
         auditService.logRow("UPDATE", id, old, item, auth.getName());
         return ResponseEntity.ok(Map.of("message", "更新成功"));
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> delete(@PathVariable Long id, Authentication auth) {
+        BudgetItem old = budgetService.findById(id);
+        if (old == null) {
+            return ResponseEntity.status(404).body(Map.of("error", "记录不存在"));
+        }
+        budgetService.delete(id);
+        auditService.logRow("DELETE", id, old, null, auth.getName());
+        return ResponseEntity.ok(Map.of("message", "删除成功"));
+    }
 }

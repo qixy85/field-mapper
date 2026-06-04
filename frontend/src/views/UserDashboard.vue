@@ -90,8 +90,18 @@ export default {
         remark: '', verifier: '',
       })
     },
-    removeRow(idx) {
-      if (this.rows.length > 1) this.rows.splice(idx, 1)
+    async removeRow(idx) {
+      const row = this.rows[idx]
+      if (row._id && !row._new) {
+        if (!confirm('确定删除第 ' + (idx+1) + ' 行？')) return
+        try {
+          await axios.delete('/api/budget/' + row._id)
+        } catch (e) {
+          alert('删除失败: ' + (e.response?.data?.error || e.message))
+          return
+        }
+      }
+      this.rows.splice(idx, 1)
     },
     async saveAll() {
       this.saving = true

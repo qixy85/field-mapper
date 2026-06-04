@@ -42,6 +42,12 @@ public class AuditService {
                     "INSERT INTO AUDIT_LOGS (TABLE_NAME, RECORD_ID, ACTION_TYPE, FIELD_NAME, " +
                     "OLD_VALUE, NEW_VALUE, MODIFIED_BY, MODIFIED_AT) VALUES (?, ?, ?, ?, ?, ?, ?, SYSTIMESTAMP)",
                     "BUDGET_ITEMS", recordId, "INSERT", "ROW_DATA", null, json, username);
+        } else if ("DELETE".equals(action)) {
+            String oldJson = toJson(oldRow, true);
+            meloneJdbcTemplate.update(
+                    "INSERT INTO AUDIT_LOGS (TABLE_NAME, RECORD_ID, ACTION_TYPE, FIELD_NAME, " +
+                    "OLD_VALUE, NEW_VALUE, MODIFIED_BY, MODIFIED_AT) VALUES (?, ?, ?, ?, ?, ?, ?, SYSTIMESTAMP)",
+                    "BUDGET_ITEMS", recordId, "DELETE", "ROW_DATA", oldJson, null, username);
         } else {
             // Build full old/new maps
             Map<String, String> oldMap = new LinkedHashMap<>();

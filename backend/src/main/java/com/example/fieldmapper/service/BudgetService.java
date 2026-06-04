@@ -78,6 +78,10 @@ public class BudgetService {
         return keyHolder.getKey().longValue();
     }
 
+    public void delete(Long id) {
+        meloneJdbcTemplate.update("DELETE FROM BUDGET_ITEMS WHERE ID = ?", id);
+    }
+
     public void update(BudgetItem item) {
         meloneJdbcTemplate.update(
                 "UPDATE BUDGET_ITEMS SET DIRECTION=?, PROJECT=?, AREA=?, SPECIFIC_COST=?, MONTH=?, " +
