@@ -73,16 +73,22 @@ public class AuditService {
 
     private void compare(Map<String, String> oldDiff, Map<String, String> newDiff,
                          String label, String oldVal, String newVal) {
-        String o = oldVal != null ? oldVal : "";
-        String n = newVal != null ? newVal : "";
-        if (!o.equals(n)) { oldDiff.put(label, o); newDiff.put(label, n); }
+        String o = (oldVal != null) ? oldVal.trim() : "";
+        String n = (newVal != null) ? newVal.trim() : "";
+        if (!o.equals(n)) {
+            oldDiff.put(label, o.isEmpty() ? "(空)" : o);
+            newDiff.put(label, n.isEmpty() ? "(空)" : n);
+        }
     }
 
     private void compareNum(Map<String, String> oldDiff, Map<String, String> newDiff,
                             String label, BigDecimal oldVal, BigDecimal newVal) {
-        String o = oldVal != null ? oldVal.toPlainString() : "0";
-        String n = newVal != null ? newVal.toPlainString() : "0";
-        if (!o.equals(n)) { oldDiff.put(label, o); newDiff.put(label, n); }
+        BigDecimal o = oldVal != null ? oldVal : BigDecimal.ZERO;
+        BigDecimal n = newVal != null ? newVal : BigDecimal.ZERO;
+        if (o.compareTo(n) != 0) {
+            oldDiff.put(label, o.stripTrailingZeros().toPlainString());
+            newDiff.put(label, n.stripTrailingZeros().toPlainString());
+        }
     }
 
     private String toJson(BudgetItem item) {
