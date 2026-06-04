@@ -68,7 +68,7 @@
           <tr v-for="log in auditLogs" :key="log.id">
             <td style="white-space:nowrap">{{ formatTime(log.modifiedAt) }}</td>
             <td>{{ log.modifiedBy }}</td>
-            <td>{{ log.actionType === 'INSERT' ? '新增' : '修改' }}</td>
+            <td>{{ log.actionType === 'INSERT' ? '新增' : log.actionType === 'DELETE' ? '删除' : '修改' }}</td>
             <td>{{ log.recordId }}</td>
             <td style="max-width:300px;font-size:11px">{{ log.oldValue || '-' }}</td>
             <td style="max-width:300px;font-size:11px">{{ log.newValue || '-' }}</td>
