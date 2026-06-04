@@ -7,9 +7,7 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Service
 public class AuditService {
@@ -36,25 +34,41 @@ public class AuditService {
 
     public void logRow(String action, Long recordId, BudgetItem oldRow, BudgetItem newRow, String username) {
         if ("INSERT".equals(action)) {
-            String json = toJson(newRow);
+            String json = toJson(newRow, true);
             meloneJdbcTemplate.update(
                     "INSERT INTO AUDIT_LOGS (TABLE_NAME, RECORD_ID, ACTION_TYPE, FIELD_NAME, " +
                     "OLD_VALUE, NEW_VALUE, MODIFIED_BY, MODIFIED_AT) VALUES (?, ?, ?, ?, ?, ?, ?, SYSTIMESTAMP)",
                     "BUDGET_ITEMS", recordId, "INSERT", "ROW_DATA", null, json, username);
         } else {
-            // Only store changed fields
+            // Build full old/new maps
+            Map<String, String> oldMap = new LinkedHashMap<>();
+            Map<String, String> newMap = new LinkedHashMap<>();
+            allFields(oldMap, oldRow);
+            allFields(newMap, newRow);
+
+            // If identical, skip
+            if (oldMap.toString().equals(newMap.toString())) return;
+
+            // Only keep changed fields
             Map<String, String> oldDiff = new LinkedHashMap<>();
             Map<String, String> newDiff = new LinkedHashMap<>();
-            compare(oldDiff, newDiff, "去向", oldRow.getDirection(), newRow.getDirection());
-            compare(oldDiff, newDiff, "项目", oldRow.getProject(), newRow.getProject());
-            compare(oldDiff, newDiff, "片区名", oldRow.getArea(), newRow.getArea());
-            compare(oldDiff, newDiff, "具体费用", oldRow.getSpecificCost(), newRow.getSpecificCost());
-            compare(oldDiff, newDiff, "月份", oldRow.getMonth(), newRow.getMonth());
-            compareNum(oldDiff, newDiff, "实际累计金额", oldRow.getActualCumulative(), newRow.getActualCumulative());
-            compareNum(oldDiff, newDiff, "当月账面累计金额", oldRow.getBookCumulative(), newRow.getBookCumulative());
-            compareNum(oldDiff, newDiff, "当月差异", oldRow.getDifference(), newRow.getDifference());
-            compare(oldDiff, newDiff, "备注/服务期限", oldRow.getRemark(), newRow.getRemark());
-            compare(oldDiff, newDiff, "数据核对人", oldRow.getVerifier(), newRow.getVerifier());
+            for (String k : oldMap.keySet()) {
+                String o = oldMap.get(k);
+                String n = newMap.getOrDefault(k, "");
+                if (!o.equals(n)) {
+                    oldDiff.put(k, o.isEmpty() ? "(空)" : o);
+                    newDiff.put(k, n.isEmpty() ? "(空)" : n);
+                }
+            }
+            for (String k : newMap.keySet()) {
+                if (!oldMap.containsKey(k)) {
+                    String n = newMap.get(k);
+                    if (!n.isEmpty()) {
+                        oldDiff.put(k, "(空)");
+                        newDiff.put(k, n);
+                    }
+                }
+            }
 
             if (oldDiff.isEmpty() && newDiff.isEmpty()) return;
 
@@ -71,46 +85,32 @@ public class AuditService {
                 "SELECT * FROM AUDIT_LOGS WHERE FIELD_NAME = 'ROW_DATA' ORDER BY ID DESC", rowMapper);
     }
 
-    private void compare(Map<String, String> oldDiff, Map<String, String> newDiff,
-                         String label, String oldVal, String newVal) {
-        String o = (oldVal != null) ? oldVal.trim() : "";
-        String n = (newVal != null) ? newVal.trim() : "";
-        if (!o.equals(n)) {
-            oldDiff.put(label, o.isEmpty() ? "(空)" : o);
-            newDiff.put(label, n.isEmpty() ? "(空)" : n);
-        }
+    private void allFields(Map<String, String> m, BudgetItem item) {
+        if (item == null) return;
+        val(m, "去向", item.getDirection());
+        val(m, "项目", item.getProject());
+        val(m, "片区名", item.getArea());
+        val(m, "具体费用", item.getSpecificCost());
+        val(m, "月份", item.getMonth());
+        num(m, "实际累计金额", item.getActualCumulative());
+        num(m, "当月账面累计金额", item.getBookCumulative());
+        num(m, "当月差异", item.getDifference());
+        val(m, "备注/服务期限", item.getRemark());
+        val(m, "数据核对人", item.getVerifier());
     }
 
-    private void compareNum(Map<String, String> oldDiff, Map<String, String> newDiff,
-                            String label, BigDecimal oldVal, BigDecimal newVal) {
-        BigDecimal o = oldVal != null ? oldVal : BigDecimal.ZERO;
-        BigDecimal n = newVal != null ? newVal : BigDecimal.ZERO;
-        if (o.compareTo(n) != 0) {
-            oldDiff.put(label, o.stripTrailingZeros().toPlainString());
-            newDiff.put(label, n.stripTrailingZeros().toPlainString());
-        }
+    private void val(Map<String, String> m, String key, String v) {
+        m.put(key, v != null ? v.trim() : "");
     }
 
-    private String toJson(BudgetItem item) {
+    private void num(Map<String, String> m, String key, BigDecimal v) {
+        m.put(key, v != null ? v.stripTrailingZeros().toPlainString() : "");
+    }
+
+    private String toJson(BudgetItem item, boolean all) {
         Map<String, String> m = new LinkedHashMap<>();
-        put(m, "去向", item.getDirection());
-        put(m, "项目", item.getProject());
-        put(m, "片区名", item.getArea());
-        put(m, "具体费用", item.getSpecificCost());
-        put(m, "月份", item.getMonth());
-        put(m, "实际累计金额", item.getActualCumulative());
-        put(m, "当月账面累计金额", item.getBookCumulative());
-        put(m, "当月差异", item.getDifference());
-        put(m, "备注/服务期限", item.getRemark());
-        put(m, "数据核对人", item.getVerifier());
+        allFields(m, item);
+        m.values().removeIf(v -> v.isEmpty());
         return m.toString();
-    }
-
-    private void put(Map<String, String> m, String key, String val) {
-        if (val != null && !val.isEmpty()) m.put(key, val);
-    }
-
-    private void put(Map<String, String> m, String key, BigDecimal val) {
-        if (val != null) m.put(key, val.toPlainString());
     }
 }
