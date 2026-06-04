@@ -8,9 +8,12 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class AuditService {
+    private static final Logger log = LoggerFactory.getLogger(AuditService.class);
 
     private final JdbcTemplate meloneJdbcTemplate;
 
@@ -47,7 +50,12 @@ public class AuditService {
             allFields(newMap, newRow);
 
             // If identical, skip
-            if (oldMap.toString().equals(newMap.toString())) return;
+            String oldStr = oldMap.toString();
+            String newStr = newMap.toString();
+            log.info("AUDIT compare old={}", oldStr);
+            log.info("AUDIT compare new={}", newStr);
+            if (oldStr.equals(newStr)) { log.info("AUDIT skip - no changes"); return; }
+            log.info("AUDIT changes detected");
 
             // Only keep changed fields
             Map<String, String> oldDiff = new LinkedHashMap<>();
