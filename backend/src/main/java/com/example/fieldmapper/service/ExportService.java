@@ -148,6 +148,9 @@ public class ExportService {
             for (int i = 0; i < headers.size(); i++) {
                 sheet.autoSizeColumn(i);
             }
+
+            wb.write(fos);
+            fos.flush();
         }
 
         log.info("Excel exported to: {}", file.getAbsolutePath());
