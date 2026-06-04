@@ -1,5 +1,7 @@
 package com.example.fieldmapper.service;
 
+import com.example.fieldmapper.config.DatasourceProperties;
+import com.example.fieldmapper.model.DatasourceConfig;
 import com.example.fieldmapper.model.MappingRequest;
 import com.example.fieldmapper.model.MappingRequest.FieldMapping;
 import org.apache.poi.ss.usermodel.*;
@@ -19,28 +21,38 @@ public class ExportService {
 
     private static final Logger log = LoggerFactory.getLogger(ExportService.class);
 
+    private final DatasourceProperties datasourceProperties;
+
+    public ExportService(DatasourceProperties datasourceProperties) {
+        this.datasourceProperties = datasourceProperties;
+    }
+
     public File export(MappingRequest req) throws Exception {
-        validate(req);
-        String url = buildJdbcUrl(req);
+        DatasourceConfig ds = resolveDatasource(req.getDatasource());
+        validate(req, ds);
+        String url = buildJdbcUrl(ds);
+
         List<FieldMapping> validMappings = req.getMappings().stream()
                 .filter(m -> m.getDbField() != null && !m.getDbField().isBlank()
                         && m.getHeader() != null && !m.getHeader().isBlank())
                 .collect(Collectors.toList());
 
-        if (validMappings.isEmpty()) {
-            throw new IllegalArgumentException("No valid field mappings provided");
-        }
-
-        // Build SELECT SQL with quoted identifiers
         String columns = validMappings.stream()
-                .map(m -> quoteIdentifier(m.getDbField(), req.getDbType()))
+                .map(m -> quoteIdentifier(m.getDbField(), ds.getType()))
                 .collect(Collectors.joining(", "));
-        String tableRef = buildTableRef(req);
+        String tableRef = buildTableRef(req.getTableName(), ds);
         String sql = "SELECT " + columns + " FROM " + tableRef;
         log.info("Executing SQL: {}", sql);
 
+        Properties connProps = new Properties();
+        connProps.setProperty("user", ds.getUsername());
+        connProps.setProperty("password", ds.getPassword());
+        if (ds.isSysdba() && "oracle".equalsIgnoreCase(ds.getType())) {
+            connProps.setProperty("internal_logon", "sysdba");
+        }
+
         List<Map<String, Object>> rows = new ArrayList<>();
-        try (Connection conn = DriverManager.getConnection(url, req.getUsername(), req.getPassword());
+        try (Connection conn = DriverManager.getConnection(url, connProps);
              Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(sql)) {
 
@@ -57,7 +69,6 @@ public class ExportService {
             }
         }
 
-        // Generate Excel
         File outputDir = new File(System.getProperty("java.io.tmpdir"), "field-mapper-exports");
         outputDir.mkdirs();
         File file = new File(outputDir, "export_" + System.currentTimeMillis() + ".xlsx");
@@ -68,7 +79,11 @@ public class ExportService {
             CellStyle headerStyle = wb.createCellStyle();
             headerStyle.setFillForegroundColor(IndexedColors.ROYAL_BLUE.getIndex());
             headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-            headerStyle.setFont(createFont(wb, true, (short) 14));
+            Font headerFont = wb.createFont();
+            headerFont.setFontName("Microsoft YaHei");
+            headerFont.setBold(true);
+            headerFont.setFontHeightInPoints((short) 14);
+            headerStyle.setFont(headerFont);
             headerStyle.setAlignment(HorizontalAlignment.CENTER);
             headerStyle.setBorderBottom(BorderStyle.THIN);
             headerStyle.setBorderTop(BorderStyle.THIN);
@@ -76,14 +91,16 @@ public class ExportService {
             headerStyle.setBorderRight(BorderStyle.THIN);
 
             CellStyle dataStyle = wb.createCellStyle();
-            dataStyle.setFont(createFont(wb, false, (short) 12));
+            Font dataFont = wb.createFont();
+            dataFont.setFontName("Microsoft YaHei");
+            dataFont.setFontHeightInPoints((short) 12);
+            dataStyle.setFont(dataFont);
             dataStyle.setAlignment(HorizontalAlignment.LEFT);
             dataStyle.setBorderBottom(BorderStyle.THIN);
             dataStyle.setBorderTop(BorderStyle.THIN);
             dataStyle.setBorderLeft(BorderStyle.THIN);
             dataStyle.setBorderRight(BorderStyle.THIN);
 
-            // Header row
             Row headerRow = sheet.createRow(0);
             List<String> headers = validMappings.stream()
                     .map(FieldMapping::getHeader).collect(Collectors.toList());
@@ -93,7 +110,6 @@ public class ExportService {
                 cell.setCellStyle(headerStyle);
             }
 
-            // Data rows
             for (int r = 0; r < rows.size(); r++) {
                 Row dataRow = sheet.createRow(r + 1);
                 Map<String, Object> rowData = rows.get(r);
@@ -105,13 +121,10 @@ public class ExportService {
                         cell.setCellValue(((Number) val).doubleValue());
                     } else if (val instanceof java.util.Date) {
                         cell.setCellValue((java.util.Date) val);
-                        CellStyle dateStyle = wb.createCellStyle();
-                        dateStyle.setDataFormat(wb.createDataFormat().getFormat("yyyy-MM-dd HH:mm:ss"));
-                        dateStyle.cloneStyleFrom(dataStyle);
-                        cell.setCellStyle(dateStyle);
-                        c++;
-                        continue;
+                    } else if (val instanceof Timestamp) {
+                        cell.setCellValue((Timestamp) val);
                     } else {
+
                         cell.setCellValue(val != null ? val.toString() : "");
                     }
                     cell.setCellStyle(dataStyle);
@@ -119,7 +132,6 @@ public class ExportService {
                 }
             }
 
-            // Auto-size columns
             for (int i = 0; i < headers.size(); i++) {
                 sheet.autoSizeColumn(i);
             }
@@ -129,60 +141,41 @@ public class ExportService {
         return file;
     }
 
-    private String buildJdbcUrl(MappingRequest req) {
-        String url;
-        if ("oracle".equalsIgnoreCase(req.getDbType())) {
-            url = "jdbc:oracle:thin:@" + req.getHost() + ":" + req.getPort() + ":" + req.getDatabase();
-        } else {
-            url = "jdbc:postgresql://" + req.getHost() + ":" + req.getPort() + "/" + req.getDatabase();
+    private DatasourceConfig resolveDatasource(String key) {
+        if (key == null || key.isBlank()) {
+            throw new IllegalArgumentException("datasource key is required");
         }
-        log.info("JDBC URL: {}", url);
-        return url;
+        Map<String, DatasourceConfig> all = datasourceProperties.getDatasources();
+        DatasourceConfig ds = all.get(key);
+        if (ds == null) {
+            throw new IllegalArgumentException("Unknown datasource: " + key
+                    + ". Available: " + String.join(", ", all.keySet()));
+        }
+        return ds;
     }
 
-    private String buildTableRef(MappingRequest req) {
-        if ("oracle".equalsIgnoreCase(req.getDbType())) {
-            String schema = (req.getSchema() != null && !req.getSchema().isBlank())
-                    ? req.getSchema() : req.getUsername().toUpperCase();
-            return quoteIdentifier(schema, req.getDbType()) + "." + quoteIdentifier(req.getTableName(), req.getDbType());
-        } else {
-            String schema = (req.getSchema() != null && !req.getSchema().isBlank())
-                    ? req.getSchema() : "public";
-            return quoteIdentifier(schema, req.getDbType()) + "." + quoteIdentifier(req.getTableName(), req.getDbType());
+    private String buildJdbcUrl(DatasourceConfig ds) {
+        if ("oracle".equalsIgnoreCase(ds.getType())) {
+            return "jdbc:oracle:thin:@" + ds.getHost() + ":" + ds.getPort() + ":" + ds.getDatabase();
         }
+        return "jdbc:postgresql://" + ds.getHost() + ":" + ds.getPort() + "/" + ds.getDatabase();
+    }
+
+    private String buildTableRef(String tableName, DatasourceConfig ds) {
+        String schema = (ds.getSchema() != null && !ds.getSchema().isBlank())
+                ? ds.getSchema() : ("oracle".equalsIgnoreCase(ds.getType()) ? ds.getUsername().toUpperCase() : "public");
+        return quoteIdentifier(schema, ds.getType()) + "." + quoteIdentifier(tableName, ds.getType());
     }
 
     private String quoteIdentifier(String name, String dbType) {
+        String s = name;
         if ("oracle".equalsIgnoreCase(dbType)) {
-            return "\"" + name.toUpperCase() + "\"";
+            s = s.toUpperCase();
         }
-        return "\"" + name + "\"";
+        return "\"" + s + "\"";
     }
 
-    private Font createFont(Workbook wb, boolean bold, short size) {
-        Font font = wb.createFont();
-        font.setFontName("Microsoft YaHei");
-        font.setBold(bold);
-        font.setFontHeightInPoints(size);
-        return font;
-    }
-
-    private void validate(MappingRequest req) {
-        if (req.getDbType() == null || req.getDbType().isBlank()) {
-            throw new IllegalArgumentException("dbType is required (postgresql / oracle)");
-        }
-        if (req.getHost() == null || req.getHost().isBlank()) {
-            throw new IllegalArgumentException("host is required");
-        }
-        if (req.getPort() <= 0) {
-            throw new IllegalArgumentException("port is required");
-        }
-        if (req.getDatabase() == null || req.getDatabase().isBlank()) {
-            throw new IllegalArgumentException("database is required");
-        }
-        if (req.getUsername() == null || req.getUsername().isBlank()) {
-            throw new IllegalArgumentException("username is required");
-        }
+    private void validate(MappingRequest req, DatasourceConfig ds) {
         if (req.getTableName() == null || req.getTableName().isBlank()) {
             throw new IllegalArgumentException("tableName is required");
         }

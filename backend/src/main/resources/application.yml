@@ -3,11 +3,39 @@ server:
 
 spring:
   datasource:
-    # Default datasource (not used directly; app creates dynamic connections)
     hikari:
       maximum-pool-size: 2
       minimum-idle: 0
 
-# File export config
+# Predefined database connections
+datasources:
+  pg-local:
+    type: postgresql
+    host: localhost
+    port: 5432
+    database: postgres
+    schema: public
+    username: postgres
+    password: postgres
+
+  oracle-local:
+    type: oracle
+    host: localhost
+    port: 1521
+    database: FREEPDB1
+    schema: HISSAAS
+    username: HISSAAS
+    password: hissaas123
+
+  oracle-cdb:
+    type: oracle
+    host: localhost
+    port: 1521
+    database: FREE
+    schema: SYSTEM
+    username: sys
+    password: oracle123
+    sysdba: true
+
 export:
   output-dir: ${java.io.tmpdir}/field-mapper-exports

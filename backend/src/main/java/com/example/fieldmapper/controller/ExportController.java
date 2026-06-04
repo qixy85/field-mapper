@@ -1,5 +1,6 @@
 package com.example.fieldmapper.controller;
 
+import com.example.fieldmapper.config.DatasourceProperties;
 import com.example.fieldmapper.model.MappingRequest;
 import com.example.fieldmapper.service.ExportService;
 import org.slf4j.Logger;
@@ -14,6 +15,8 @@ import org.springframework.web.bind.annotation.*;
 import java.io.File;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api")
@@ -22,9 +25,27 @@ public class ExportController {
     private static final Logger log = LoggerFactory.getLogger(ExportController.class);
 
     private final ExportService exportService;
+    private final DatasourceProperties datasourceProperties;
 
-    public ExportController(ExportService exportService) {
+    public ExportController(ExportService exportService, DatasourceProperties datasourceProperties) {
         this.exportService = exportService;
+        this.datasourceProperties = datasourceProperties;
+    }
+
+    @GetMapping("/datasources")
+    public Map<String, Object> listDatasources() {
+        Map<String, Object> result = new LinkedHashMap<>();
+        datasourceProperties.getDatasources().forEach((key, cfg) -> {
+            Map<String, Object> info = new LinkedHashMap<>();
+            info.put("type", cfg.getType());
+            info.put("host", cfg.getHost());
+            info.put("port", cfg.getPort());
+            info.put("database", cfg.getDatabase());
+            info.put("schema", cfg.getSchema());
+            info.put("username", cfg.getUsername());
+            result.put(key, info);
+        });
+        return result;
     }
 
     @PostMapping("/export")
