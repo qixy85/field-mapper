@@ -61,7 +61,7 @@ public class BudgetService {
                     "INSERT INTO BUDGET_ITEMS (DIRECTION, PROJECT, AREA, SPECIFIC_COST, MONTH, " +
                     "ACTUAL_CUMULATIVE, BOOK_CUMULATIVE, DIFFERENCE, REMARK, VERIFIER, CREATED_BY, CREATED_AT, UPDATED_AT) " +
                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, SYSTIMESTAMP, SYSTIMESTAMP)",
-                    Statement.RETURN_GENERATED_KEYS);
+                    new String[]{"ID"});
             ps.setString(1, item.getDirection());
             ps.setString(2, item.getProject());
             ps.setString(3, item.getArea());
