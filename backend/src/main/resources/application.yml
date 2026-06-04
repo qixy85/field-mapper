@@ -5,6 +5,7 @@ app:
   jwt:
     secret: field-mapper-secret-key-must-be-at-least-256-bits-long-12345678
     expiration: 86400000
+  business-datasource: melone
   datasources:
     pg-local:
       type: postgresql
