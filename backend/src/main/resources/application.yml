@@ -1,0 +1,13 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    # Default datasource (not used directly; app creates dynamic connections)
+    hikari:
+      maximum-pool-size: 2
+      minimum-idle: 0
+
+# File export config
+export:
+  output-dir: ${java.io.tmpdir}/field-mapper-exports
