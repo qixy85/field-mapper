@@ -62,13 +62,16 @@
     <div v-if="tab === 'audit'" class="tab-content">
       <table>
         <thead>
-          <tr><th>ID</th><th>表名</th><th>记录ID</th><th>操作</th><th>字段</th><th>旧值</th><th>新值</th><th>操作人</th><th>时间</th></tr>
+          <tr><th>时间</th><th>操作人</th><th>操作</th><th>记录ID</th><th>修改前数据</th><th>修改后数据</th></tr>
         </thead>
         <tbody>
           <tr v-for="log in auditLogs" :key="log.id">
-            <td>{{ log.id }}</td><td>{{ log.tableName }}</td><td>{{ log.recordId }}</td>
-            <td>{{ log.actionType }}</td><td>{{ log.fieldName }}</td><td>{{ log.oldValue }}</td>
-            <td>{{ log.newValue }}</td><td>{{ log.modifiedBy }}</td><td>{{ log.modifiedAt }}</td>
+            <td style="white-space:nowrap">{{ formatTime(log.modifiedAt) }}</td>
+            <td>{{ log.modifiedBy }}</td>
+            <td>{{ log.actionType === 'INSERT' ? '新增' : '修改' }}</td>
+            <td>{{ log.recordId }}</td>
+            <td style="max-width:300px;font-size:11px">{{ log.oldValue || '-' }}</td>
+            <td style="max-width:300px;font-size:11px">{{ log.newValue || '-' }}</td>
           </tr>
         </tbody>
       </table>
@@ -100,6 +103,11 @@ export default {
     await this.loadAudit()
   },
   methods: {
+    formatTime(t) {
+      if (!t) return '-'
+      const d = new Date(t)
+      return d.toLocaleString('zh-CN', { hour12: false })
+    },
     async loadUsers() { try { const r = await axios.get('/api/users'); this.users = r.data } catch {} },
     async loadBudget() { try { const r = await axios.get('/api/budget'); this.budgetItems = r.data } catch {} },
     async loadAudit() { try { const r = await axios.get('/api/audit/logs'); this.auditLogs = r.data } catch {} },
