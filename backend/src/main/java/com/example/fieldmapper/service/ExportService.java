@@ -129,6 +129,14 @@ public class ExportService {
                 int c = 0;
                 for (FieldMapping fm : validMappings) {
                     Object val = rowData.get(fm.getDbField());
+                    if (val == null) {
+                        for (Map.Entry<String, Object> e : rowData.entrySet()) {
+                            if (e.getKey().equalsIgnoreCase(fm.getDbField())) {
+                                val = e.getValue();
+                                break;
+                            }
+                        }
+                    }
                     Cell cell = dataRow.createCell(c);
                     if (val instanceof Number) {
                         cell.setCellValue(((Number) val).doubleValue());
